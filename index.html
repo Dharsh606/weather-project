@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title> Weather App</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap");
+    :root {
+      --bg: #1e293b;
+      --text: #f1f5f9;
+      --card: #334155;
+      --accent: #0ea5e9;
+    }
+    [data-theme='light'] {
+      --bg: #f1f5f9;
+      --text: #1e293b;
+      --card: #ffffff;
+      --accent: #0284c7;
+    }
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "Poppins", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { margin-bottom: 0.5rem; }
+    form, .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    input, button, select {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 20px;
+      font-size: 1rem;
+    }
+    input { min-width: 200px; }
+    button, select {
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 15px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+    .forecast {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .forecast-day {
+      flex: 1;
+      min-width: 90px;
+      background: var(--accent);
+      border-radius: 10px;
+      padding: 10px;
+      color: white;
+    }
+    .history {
+      margin-top: 10px;
+      font-size: 0.9rem;
+    }
+    .history span {
+      cursor: pointer;
+      color: var(--accent);
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <h1>🌤 Weather App</h1>
+
+  <form id="form">
+    <input type="text" id="search" placeholder="Search city..." />
+    <button type="submit">Search</button>
+  </form>
+
+  <div class="controls">
+    <button id="geoBtn">📍 My Location</button>
+    <select id="unitToggle">
+      <option value="metric">°C</option>
+      <option value="imperial">°F</option>
+    </select>
+    <button id="themeToggle">🌓 Toggle Theme</button>
+  </div>
+
+  <div class="history" id="history"></div>
+
+  <div id="main"></div>
+
+  <script>
+    const apiKey = "210a413da25a3972d83b7558ef18f665";
+    const main = document.getElementById("main");
+    const form = document.getElementById("form");
+    const search = document.getElementById("search");
+    const geoBtn = document.getElementById("geoBtn");
+    const unitToggle = document.getElementById("unitToggle");
+    const themeToggle = document.getElementById("themeToggle");
+    const historyDiv = document.getElementById("history");
+    let units = "metric";
+
+    function saveHistory(city) {
+      let hist = JSON.parse(localStorage.getItem("weather_history")) || [];
+      if (!hist.includes(city)) {
+        hist.unshift(city);
+        hist = hist.slice(0, 5);
+        localStorage.setItem("weather_history", JSON.stringify(hist));
+        renderHistory();
+      }
+    }
+
+    function renderHistory() {
+      const hist = JSON.parse(localStorage.getItem("weather_history")) || [];
+      historyDiv.innerHTML = "Recent: ";
+      hist.forEach(city => {
+        const span = document.createElement("span");
+        span.textContent = city;
+        span.onclick = () => getWeather(city);
+        historyDiv.appendChild(span);
+      });
+    }
+
+    function KtoC(k) { return Math.round(k - 273.15); }
+    function formatDate(dt, tz) {
+      return new Date((dt + tz) * 1000).toUTCString().replace("GMT", "");
+    }
+
+    async function getWeather(city) {
+      main.innerHTML = "Loading...";
+      try {
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=${units}&appid=${apiKey}`);
+        const data = await res.json();
+        if (data.cod !== 200) throw new Error(data.message);
+
+        const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=${units}&appid=${apiKey}`);
+        const forecastData = await forecastRes.json();
+
+        showWeather(data, forecastData.list);
+        saveHistory(city);
+      } catch (err) {
+        main.innerHTML = `<div class="card"><h2>Error</h2><p>${err.message}</p></div>`;
+      }
+    }
+
+    function showWeather(data, forecastList) {
+      const { name, sys, main: m, weather, wind, timezone, dt } = data;
+      const temp = m.temp;
+      const icon = weather[0].icon;
+      const desc = weather[0].description;
+      const feels = m.feels_like;
+      const time = formatDate(dt, timezone);
+
+      let forecastDays = forecastList.filter((f, i) => i % 8 === 0).slice(1, 6); // Next 5 days
+
+      const forecastHTML = forecastDays.map(f => {
+        return `
+          <div class="forecast-day">
+            <h4>${new Date(f.dt_txt).toDateString().split(" ")[0]}</h4>
+            <img src="https://openweathermap.org/img/wn/${f.weather[0].icon}.png" />
+            <p>${Math.round(f.main.temp)}°</p>
+          </div>
+        `;
+      }).join("");
+
+      main.innerHTML = `
+        <div class="card">
+          <h2>${name}, ${sys.country}</h2>
+          <p>${time}</p>
+          <h3><img src="https://openweathermap.org/img/wn/${icon}@2x.png" /> ${temp}°</h3>
+          <p>${desc}</p>
+          <p>Feels like: ${feels}°, Humidity: ${m.humidity}%, Wind: ${wind.speed} ${units === "metric" ? "m/s" : "mph"}</p>
+          <div class="forecast">${forecastHTML}</div>
+        </div>
+      `;
+    }
+
+    function getGeoWeather() {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        main.innerHTML = "Loading...";
+        try {
+          const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${apiKey}`);
+          const data = await res.json();
+          getWeather(data.name);
+        } catch (err) {
+          main.innerHTML = `<div class="card"><h2>Error</h2><p>${err.message}</p></div>`;
+        }
+      }, () => {
+        alert("Location permission denied.");
+      });
+    }
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const city = search.value.trim();
+      if (city) getWeather(city);
+    });
+
+    geoBtn.onclick = getGeoWeather;
+
+    unitToggle.onchange = () => {
+      units = unitToggle.value;
+      const hist = JSON.parse(localStorage.getItem("weather_history")) || [];
+      if (hist.length > 0) getWeather(hist[0]);
+    };
+
+    themeToggle.onclick = () => {
+      const current = document.body.getAttribute("data-theme");
+      document.body.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+    };
+
+    // Auto load last searched or geolocation
+    renderHistory();
+    const last = JSON.parse(localStorage.getItem("weather_history")) || [];
+    if (last.length) getWeather(last[0]);
+    else getGeoWeather();
+  </script>
+</body>
+</html>
