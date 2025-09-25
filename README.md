@@ -20,8 +20,6 @@ A responsive and user-friendly weather application that allows users to search f
 ![Weather Project Search](./documents/weather3.png)
 ![Weather Project Search](./documents/weather3.png)
 
-*(Add actual screenshots from your project under an `assets/` folder and update the paths above.)*
-
 ---
 
 ## ✨ Features
